@@ -1,0 +1,41 @@
+name: build-and-publish
+
+on:
+  workflow_run:
+    workflows: [ "Prepare" ]
+    types:
+      - completed
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download SHA Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: specific-sha
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Read SHA into Variable
+        id: get_sha
+        run: |
+          # Read the file content into an environment variable
+          echo "SHA=$(cat sha.txt)" >> $GITHUB_ENV
+
+
+      - name: Docker Build and Push Action
+        uses: mr-smithers-excellent/docker-build-push@v5
+        with:
+          directory: .
+          dockerfile: 'docker/Dockerfile.prod'
+          pushImage: true
+          image: damou/library-app-search-indexer
+          tags: ${{ env.SHA }}
+          registry: docker.io
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
