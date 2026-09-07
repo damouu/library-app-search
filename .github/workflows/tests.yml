@@ -1,0 +1,83 @@
+name: Tests
+
+on:
+  push:
+    branches:
+      - test
+
+jobs:
+  Test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.27'
+          cache: true
+
+      - name: Set environment variables
+        run: echo "GITHUB_SHA_SHORT=$(echo $GITHUB_SHA | cut -c 1-7)" >> $GITHUB_ENV
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run Unit Tests
+        id: run_tests
+        run: go test ./...
+
+      - name: Run Tests with Race Detector
+        id: run_race_tests
+        run: go test -race ./...
+
+      - name: Run Go Vet
+        id: go_vet
+        run: go vet ./...
+
+      - name: Generate coverage report
+        run: ./scripts/coverage.sh
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          branch: test
+          files: coverage.out
+          fail_ci_if_error: true
+
+      - name: Create an issue
+        if: ${{ failure() }}
+        uses: JasonEtco/create-an-issue@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          actor: ${{ github.actor }}
+          sha: ${{ env.GITHUB_SHA_SHORT }}
+        with:
+          assignees: ${{ github.actor }}
+          update_existing: true
+          search_existing: open
+
+      - name: Move YouTrack issue to TestFailed
+        if: ${{ failure() }}
+        uses: bloobirds-it/action-youtrack-move@v1.0.0
+        with:
+          github-token: ${{ secrets.MyWorkflow }}
+          yt-url: ${{ secrets.YOUTRACK_URL }}
+          yt-token: ${{ secrets.YOUTRACK_TOKEN }}
+          yt-project-id: "SD"
+          yt-column-triggers: "Test"
+          yt-column-target: "TestFailed"
+
+      - name: Create Pull Request
+        if: ${{ success() }}
+        uses: repo-sync/pull-request@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.MYWORKFLOW }}
+        with:
+          source_branch: "test"
+          destination_branch: "main"
+          pr_title: ${{ github.event.head_commit.message }}
+          pr_body: ${{ github.event.head_commit.message }}
+          pr_label: "Staging,TestsPassed"
+          pr_assignee: "damouu"
