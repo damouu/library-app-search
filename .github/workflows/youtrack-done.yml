@@ -1,0 +1,22 @@
+name: YouTrack-Closed
+
+on:
+  pull_request:
+    types:
+      - closed
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    if: ${{ github.event.pull_request.merged == true }}
+
+    steps:
+      - uses: bloobirds-it/action-youtrack-move@v1.0.0
+        with:
+          github-token: ${{ secrets.MyWorkflow }}
+          yt-url: ${{ secrets.YOUTRACK_URL }}
+          yt-token: ${{ secrets.YOUTRACK_TOKEN }}
+          yt-project-id: "LAS"
+          yt-column-triggers: "Staging"
+          yt-column-target: "Done"
