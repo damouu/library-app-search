@@ -1,0 +1,18 @@
+name: Prepare
+on:
+  pull_request:
+    types:
+      - closed
+
+jobs:
+  get-sha:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Save SHA to file
+        run: echo ${{ github.event.pull_request.head.sha }} > sha.txt
+
+      - name: Upload SHA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: specific-sha
+          path: sha.txt
