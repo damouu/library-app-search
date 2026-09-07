@@ -12,7 +12,6 @@ func main() {
 
 	router.Get("/health/live", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.WriteHeader(22)
 	})
 
 	log.Println("Search API listening on :8080")
