@@ -45,6 +45,8 @@ jobs:
           branch: test
           files: coverage.out
           fail_ci_if_error: true
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Create an issue
         if: ${{ failure() }}
