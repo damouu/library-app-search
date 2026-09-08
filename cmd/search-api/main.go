@@ -1,6 +1,9 @@
 package main
 
 import (
+	"library-app-search/internal/config"
+	elasticsearch2 "library-app-search/internal/elasticsearch"
+	"library-app-search/internal/health"
 	"log"
 	"net/http"
 
@@ -8,11 +11,23 @@ import (
 )
 
 func main() {
+
+	cfg := config.Load()
+	client, err := elasticsearch2.CreateClient(&cfg.Elasticsearch)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	healthChecker := elasticsearch2.NewHealthChecker(client)
+
+	healthHandler := health.NewHandler(healthChecker)
+
 	router := chi.NewRouter()
 
-	router.Get("/health/live", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	})
+	router.Get("/health/live", health.LiveHandler)
+
+	router.Get("/health/ready", healthHandler.ReadyHandler)
 
 	log.Println("Search API listening on :8080")
 
