@@ -16,7 +16,7 @@ jobs:
           github-token: ${{ secrets.MyWorkflow }}
           yt-url: ${{ secrets.YOUTRACK_URL }}
           yt-token: ${{ secrets.YOUTRACK_TOKEN }}
-          yt-project-id: "LAS"
+          yt-project-id: "LAA"
           yt-column-triggers: "Test"
           yt-column-target: "Staging"
 

@@ -45,6 +45,8 @@ jobs:
           branch: test
           files: coverage.out
           fail_ci_if_error: true
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Create an issue
         if: ${{ failure() }}
@@ -65,7 +67,7 @@ jobs:
           github-token: ${{ secrets.MyWorkflow }}
           yt-url: ${{ secrets.YOUTRACK_URL }}
           yt-token: ${{ secrets.YOUTRACK_TOKEN }}
-          yt-project-id: "SD"
+          yt-project-id: "LAA"
           yt-column-triggers: "Test"
           yt-column-target: "TestFailed"
 
