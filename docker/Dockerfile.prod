@@ -8,7 +8,7 @@ RUN go mod download
 
 COPY .. .
 
-RUN go build -o search-indexer ./cmd/search-indexer
+RUN go build -o search-api ./cmd/search-api
 
 
 # Runtime stage
@@ -20,6 +20,6 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /app/search-indexer .
+COPY --from=builder /app/search-api .
 
 CMD ["./search-indexer"]
