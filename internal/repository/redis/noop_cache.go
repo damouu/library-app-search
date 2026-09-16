@@ -8,10 +8,10 @@ func NewNoopCacheRepository() *NoopCacheRepository {
 	return &NoopCacheRepository{}
 }
 
-func (c *NoopCacheRepository) FetchChaptersCache(query string) ([]domain.Chapter, bool, error) {
-	return nil, false, nil
+func (c *NoopCacheRepository) FetchChaptersCache(params domain.SearchParams) (domain.SearchResult, bool, error) {
+	return domain.SearchResult{}, false, nil
 }
 
-func (c *NoopCacheRepository) PutChaptersCache(query string, chapters []domain.Chapter) error {
+func (c *NoopCacheRepository) PutChaptersCache(params domain.SearchParams, result domain.SearchResult) error {
 	return nil
 }

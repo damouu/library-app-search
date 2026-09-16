@@ -8,46 +8,102 @@ import (
 )
 
 type fakeCacheRepository struct {
-	cachedChapters []domain.Chapter
-	found          bool
-	fetchErr       error
-	putErr         error
+	cachedResult domain.SearchResult
+	found        bool
+	fetchErr     error
+	putErr       error
 
-	fetchCalled bool
-	putCalled   bool
+	fetchCalled     bool
+	putCalled       bool
+	lastFetchParams domain.SearchParams
+	lastPutParams   domain.SearchParams
 }
 
-func (f *fakeCacheRepository) FetchChaptersCache(query string) ([]domain.Chapter, bool, error) {
+func (f *fakeCacheRepository) FetchChaptersCache(params domain.SearchParams) (domain.SearchResult, bool, error) {
 	f.fetchCalled = true
+	f.lastFetchParams = params
 
 	if f.fetchErr != nil {
-		return nil, false, f.fetchErr
+		return domain.SearchResult{}, false, f.fetchErr
 	}
 
-	return f.cachedChapters, f.found, nil
+	return f.cachedResult, f.found, nil
 }
 
-func (f *fakeCacheRepository) PutChaptersCache(query string, chapters []domain.Chapter) error {
+func (f *fakeCacheRepository) PutChaptersCache(params domain.SearchParams, result domain.SearchResult) error {
 	f.putCalled = true
-
+	f.lastPutParams = params
 	return f.putErr
 }
 
 type fakeSearchRepository struct {
-	chapters []domain.Chapter
-	err      error
+	result domain.SearchResult
+	err    error
 
-	searchCalled bool
+	searchCalled     bool
+	lastSearchParams domain.SearchParams
 }
 
-func (f *fakeSearchRepository) SearchChapters(query string) ([]domain.Chapter, error) {
+func (f *fakeSearchRepository) SearchChapters(params domain.SearchParams) (domain.SearchResult, error) {
 	f.searchCalled = true
-
+	f.lastSearchParams = params
 	if f.err != nil {
-		return nil, f.err
+		return domain.SearchResult{}, f.err
 	}
 
-	return f.chapters, nil
+	return f.result, nil
+}
+
+func TestSearchService_PropagatesSearchParams(t *testing.T) {
+	params := domain.SearchParams{
+		Query: "one piece",
+		Page:  2,
+		Size:  3,
+	}
+
+	cacheRepository := &fakeCacheRepository{
+		found: false,
+	}
+
+	searchRepository := &fakeSearchRepository{
+		result: domain.SearchResult{
+			Items: []domain.Chapter{},
+			Page:  params.Page,
+			Size:  params.Size,
+			Total: 0,
+		},
+	}
+
+	service := NewSearchService(cacheRepository, searchRepository)
+
+	_, err := service.SearchChapters(params)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if cacheRepository.lastFetchParams != params {
+		t.Fatalf(
+			"unexpected cache fetch params: got %+v, want %+v",
+			cacheRepository.lastFetchParams,
+			params,
+		)
+	}
+
+	if searchRepository.lastSearchParams != params {
+		t.Fatalf(
+			"unexpected search params: got %+v, want %+v",
+			searchRepository.lastSearchParams,
+			params,
+		)
+	}
+
+	if cacheRepository.lastPutParams != params {
+		t.Fatalf(
+			"unexpected cache put params: got %+v, want %+v",
+			cacheRepository.lastPutParams,
+			params,
+		)
+	}
 }
 
 func TestSearchService_ReturnsCachedChapters(t *testing.T) {
@@ -59,15 +115,24 @@ func TestSearchService_ReturnsCachedChapters(t *testing.T) {
 	}
 
 	cacheRepository := &fakeCacheRepository{
-		cachedChapters: cachedChapters,
-		found:          true,
+		cachedResult: domain.SearchResult{
+			Items: cachedChapters,
+			Page:  1,
+			Size:  10,
+			Total: 1,
+		},
+		found: true,
 	}
 
 	searchRepository := &fakeSearchRepository{}
 
 	service := NewSearchService(cacheRepository, searchRepository)
 
-	result, err := service.SearchChapters("one piece")
+	result, err := service.SearchChapters(domain.SearchParams{
+		Query: "one piece",
+		Page:  1,
+		Size:  10,
+	})
 
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -81,12 +146,16 @@ func TestSearchService_ReturnsCachedChapters(t *testing.T) {
 		t.Fatal("expected search repository not to be called when cache contains data")
 	}
 
-	if len(result) != 1 {
-		t.Fatalf("expected 1 chapter, got %d", len(result))
+	if len(result.Items) != 1 {
+		t.Fatalf("expected 1 chapter, got %d", len(result.Items))
 	}
 
-	if result[0].Title != "One Piece" {
-		t.Fatalf("expected title %q, got %q", "One Piece", result[0].Title)
+	if result.Items[0].Title != "One Piece" {
+		t.Fatalf(
+			"expected title %q, got %q",
+			"One Piece",
+			result.Items[0].Title,
+		)
 	}
 }
 
@@ -103,12 +172,21 @@ func TestSearchService_SearchesElasticsearchOnCacheMiss(t *testing.T) {
 	}
 
 	searchRepository := &fakeSearchRepository{
-		chapters: chapters,
+		result: domain.SearchResult{
+			Items: chapters,
+			Page:  1,
+			Size:  10,
+			Total: 1,
+		},
 	}
 
 	service := NewSearchService(cacheRepository, searchRepository)
 
-	result, err := service.SearchChapters("one piece")
+	result, err := service.SearchChapters(domain.SearchParams{
+		Query: "one piece",
+		Page:  1,
+		Size:  10,
+	})
 
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -122,8 +200,8 @@ func TestSearchService_SearchesElasticsearchOnCacheMiss(t *testing.T) {
 		t.Fatal("expected results to be stored in cache")
 	}
 
-	if len(result) != 1 {
-		t.Fatalf("expected 1 chapter, got %d", len(result))
+	if len(result.Items) != 1 {
+		t.Fatalf("expected 1 chapter, got %d", len(result.Items))
 	}
 }
 
@@ -138,7 +216,11 @@ func TestSearchService_ReturnsErrorWhenCacheFails(t *testing.T) {
 
 	service := NewSearchService(cacheRepository, searchRepository)
 
-	_, err := service.SearchChapters("one piece")
+	_, err := service.SearchChapters(domain.SearchParams{
+		Query: "one piece",
+		Page:  1,
+		Size:  10,
+	})
 
 	if !errors.Is(err, expectedErr) {
 		t.Fatalf("expected error %v, got %v", expectedErr, err)
@@ -162,7 +244,11 @@ func TestSearchService_ReturnsErrorWhenSearchFails(t *testing.T) {
 
 	service := NewSearchService(cacheRepository, searchRepository)
 
-	_, err := service.SearchChapters("one piece")
+	_, err := service.SearchChapters(domain.SearchParams{
+		Query: "one piece",
+		Page:  1,
+		Size:  10,
+	})
 
 	if !errors.Is(err, expectedErr) {
 		t.Fatalf("expected error %v, got %v", expectedErr, err)
@@ -184,12 +270,21 @@ func TestSearchService_ReturnsErrorWhenCacheWriteFails(t *testing.T) {
 	}
 
 	searchRepository := &fakeSearchRepository{
-		chapters: []domain.Chapter{},
+		result: domain.SearchResult{
+			Items: []domain.Chapter{},
+			Page:  1,
+			Size:  10,
+			Total: 0,
+		},
 	}
 
 	service := NewSearchService(cacheRepository, searchRepository)
 
-	_, err := service.SearchChapters("one piece")
+	_, err := service.SearchChapters(domain.SearchParams{
+		Query: "one piece",
+		Page:  1,
+		Size:  10,
+	})
 
 	if !errors.Is(err, expectedErr) {
 		t.Fatalf("expected error %v, got %v", expectedErr, err)
