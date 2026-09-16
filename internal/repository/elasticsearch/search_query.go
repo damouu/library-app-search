@@ -1,6 +1,8 @@
 package elasticsearch
 
 type SearchQuery struct {
+	From  int         `json:"from"`
+	Size  int         `json:"size"`
 	Query QueryClause `json:"query"`
 }
 
