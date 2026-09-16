@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"library-app-search/internal/application"
 	"library-app-search/internal/config"
 	elasticsearch2 "library-app-search/internal/elasticsearch"
@@ -11,6 +12,7 @@ import (
 	"library-app-search/internal/router"
 	"log"
 	"net/http"
+	"time"
 )
 
 func main() {
@@ -24,7 +26,19 @@ func main() {
 
 	searchRepository := elasticsearchRepository.NewSearchRepository(client)
 
-	cacheRepository := redisRepository.NewNoopCacheRepository()
+	redisClient, err := redisRepository.CreateClient(&cfg.Redis)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if err := redisClient.Ping(context.Background()).Err(); err != nil {
+		log.Fatal(err)
+	}
+
+	cacheRepository := redisRepository.NewRedisCacheRepository(
+		redisClient,
+		5*time.Minute,
+	)
 
 	searchService := application.NewSearchService(
 		cacheRepository,
