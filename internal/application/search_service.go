@@ -3,12 +3,12 @@ package application
 import "library-app-search/internal/domain"
 
 type CacheRepository interface {
-	FetchChaptersCache(query string) ([]domain.Chapter, bool, error)
-	PutChaptersCache(query string, chapters []domain.Chapter) error
+	FetchChaptersCache(params domain.SearchParams) (domain.SearchResult, bool, error)
+	PutChaptersCache(params domain.SearchParams, result domain.SearchResult) error
 }
 
 type SearchRepository interface {
-	SearchChapters(query string) ([]domain.Chapter, error)
+	SearchChapters(params domain.SearchParams) (domain.SearchResult, error)
 }
 
 type SearchService struct {
@@ -23,25 +23,25 @@ func NewSearchService(cacheRepository CacheRepository, searchRepository SearchRe
 	}
 }
 
-func (s *SearchService) SearchChapters(query string) ([]domain.Chapter, error) {
-	chapters, found, err := s.cacheRepository.FetchChaptersCache(query)
+func (s *SearchService) SearchChapters(params domain.SearchParams) (domain.SearchResult, error) {
+	result, found, err := s.cacheRepository.FetchChaptersCache(params)
 	if err != nil {
-		return nil, err
+		return domain.SearchResult{}, err
 	}
 
 	if found {
-		return chapters, nil
+		return result, nil
 	}
 
-	chapters, err = s.searchRepository.SearchChapters(query)
+	result, err = s.searchRepository.SearchChapters(params)
 	if err != nil {
-		return nil, err
+		return domain.SearchResult{}, err
 	}
 
-	err = s.cacheRepository.PutChaptersCache(query, chapters)
+	err = s.cacheRepository.PutChaptersCache(params, result)
 	if err != nil {
-		return nil, err
+		return domain.SearchResult{}, err
 	}
 
-	return chapters, nil
+	return result, nil
 }
