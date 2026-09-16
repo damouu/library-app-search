@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+
 	"github.com/elastic/go-elasticsearch/v9"
 	"library-app-search/internal/domain"
 )
@@ -13,7 +14,12 @@ type SearchHit struct {
 }
 
 type SearchHits struct {
-	Hits []SearchHit `json:"hits"`
+	Total TotalHits   `json:"total"`
+	Hits  []SearchHit `json:"hits"`
+}
+
+type TotalHits struct {
+	Value int `json:"value"`
 }
 
 type SearchResponse struct {
@@ -30,46 +36,58 @@ func NewSearchRepository(client *elasticsearch.Client) *SearchRepository {
 	}
 }
 
-func (s *SearchRepository) SearchChapters(query string) ([]domain.Chapter, error) {
+func (s *SearchRepository) SearchChapters(
+	params domain.SearchParams,
+) (domain.SearchResult, error) {
 	searchQuery := SearchQuery{
-		Query: QueryClause{MultiMatch: MultiMatch{
-			Query:  query,
-			Fields: []string{"title", "second_title", "summary"},
-		}},
+		From: (params.Page - 1) * params.Size,
+		Size: params.Size,
+		Query: QueryClause{
+			MultiMatch: MultiMatch{
+				Query:  params.Query,
+				Fields: []string{"title", "second_title", "summary"},
+			},
+		},
 	}
-	jsonData, err := json.Marshal(searchQuery)
+
+	requestBody, err := json.Marshal(searchQuery)
 	if err != nil {
-		return nil, err
+		return domain.SearchResult{}, err
 	}
-	requestBody := bytes.NewReader(jsonData)
 
 	response, err := s.client.Search(
 		s.client.Search.WithIndex("chapters"),
-		s.client.Search.WithBody(requestBody),
+		s.client.Search.WithBody(bytes.NewReader(requestBody)),
 	)
-
 	if err != nil {
-		return nil, err
-	}
-
-	if response.IsError() {
-		return nil, fmt.Errorf("elasticsearch error: %s", response.Status())
+		return domain.SearchResult{}, err
 	}
 
 	defer response.Body.Close()
 
-	var searchResponse SearchResponse
-
-	err = json.NewDecoder(response.Body).Decode(&searchResponse)
-	if err != nil {
-		return nil, err
+	if response.IsError() {
+		return domain.SearchResult{}, fmt.Errorf(
+			"elasticsearch error: %s",
+			response.Status(),
+		)
 	}
 
-	chapters := make([]domain.Chapter, 0)
+	var searchResponse SearchResponse
+
+	if err := json.NewDecoder(response.Body).Decode(&searchResponse); err != nil {
+		return domain.SearchResult{}, err
+	}
+
+	chapters := make([]domain.Chapter, 0, len(searchResponse.Hits.Hits))
 
 	for _, hit := range searchResponse.Hits.Hits {
 		chapters = append(chapters, hit.Source)
 	}
-	return chapters, nil
 
+	return domain.SearchResult{
+		Items: chapters,
+		Page:  params.Page,
+		Size:  params.Size,
+		Total: searchResponse.Hits.Total.Value,
+	}, nil
 }
