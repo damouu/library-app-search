@@ -9,43 +9,48 @@ import (
 	"library-app-search/internal/domain"
 )
 
+// SearchHit represents an Elasticsearch search hit.
 type SearchHit struct {
 	Source domain.Chapter `json:"_source"`
 }
 
+// SearchHits contains the total number of matches and the returned documents.
 type SearchHits struct {
 	Total TotalHits   `json:"total"`
 	Hits  []SearchHit `json:"hits"`
 }
 
+// TotalHits contains the total number of matching documents.
 type TotalHits struct {
 	Value int `json:"value"`
 }
 
+// SearchResponse represents the relevant part of the Elasticsearch search response.
 type SearchResponse struct {
 	Hits SearchHits `json:"hits"`
 }
 
+// SearchRepository provides chapter search operations using Elasticsearch.
 type SearchRepository struct {
 	client *elasticsearch.Client
 }
 
+// NewSearchRepository creates a search repository using the provided Elasticsearch client.
 func NewSearchRepository(client *elasticsearch.Client) *SearchRepository {
 	return &SearchRepository{
 		client: client,
 	}
 }
 
-func (s *SearchRepository) SearchChapters(
-	params domain.SearchParams,
-) (domain.SearchResult, error) {
+// SearchChapters searches chapters by title and second title with pagination.
+func (s *SearchRepository) SearchChapters(params domain.SearchParams) (domain.SearchResult, error) {
 	searchQuery := SearchQuery{
 		From: (params.Page - 1) * params.Size,
 		Size: params.Size,
 		Query: QueryClause{
 			MultiMatch: MultiMatch{
 				Query:  params.Query,
-				Fields: []string{"title", "second_title", "summary"},
+				Fields: []string{"title", "second_title"},
 			},
 		},
 	}

@@ -2,6 +2,7 @@ package application
 
 import (
 	"errors"
+	"reflect"
 	"testing"
 
 	"library-app-search/internal/domain"
@@ -17,6 +18,7 @@ type fakeCacheRepository struct {
 	putCalled       bool
 	lastFetchParams domain.SearchParams
 	lastPutParams   domain.SearchParams
+	lastPutResult   domain.SearchResult
 }
 
 func (f *fakeCacheRepository) FetchChaptersCache(params domain.SearchParams) (domain.SearchResult, bool, error) {
@@ -33,6 +35,8 @@ func (f *fakeCacheRepository) FetchChaptersCache(params domain.SearchParams) (do
 func (f *fakeCacheRepository) PutChaptersCache(params domain.SearchParams, result domain.SearchResult) error {
 	f.putCalled = true
 	f.lastPutParams = params
+	f.lastPutResult = result
+
 	return f.putErr
 }
 
@@ -47,6 +51,7 @@ type fakeSearchRepository struct {
 func (f *fakeSearchRepository) SearchChapters(params domain.SearchParams) (domain.SearchResult, error) {
 	f.searchCalled = true
 	f.lastSearchParams = params
+
 	if f.err != nil {
 		return domain.SearchResult{}, f.err
 	}
@@ -114,14 +119,16 @@ func TestSearchService_ReturnsCachedChapters(t *testing.T) {
 		},
 	}
 
+	cachedResult := domain.SearchResult{
+		Items: cachedChapters,
+		Page:  1,
+		Size:  10,
+		Total: 1,
+	}
+
 	cacheRepository := &fakeCacheRepository{
-		cachedResult: domain.SearchResult{
-			Items: cachedChapters,
-			Page:  1,
-			Size:  10,
-			Total: 1,
-		},
-		found: true,
+		cachedResult: cachedResult,
+		found:        true,
 	}
 
 	searchRepository := &fakeSearchRepository{}
@@ -146,6 +153,10 @@ func TestSearchService_ReturnsCachedChapters(t *testing.T) {
 		t.Fatal("expected search repository not to be called when cache contains data")
 	}
 
+	if cacheRepository.putCalled {
+		t.Fatal("expected cache repository not to be called when cache contains data")
+	}
+
 	if len(result.Items) != 1 {
 		t.Fatalf("expected 1 chapter, got %d", len(result.Items))
 	}
@@ -167,17 +178,19 @@ func TestSearchService_SearchesElasticsearchOnCacheMiss(t *testing.T) {
 		},
 	}
 
+	searchResult := domain.SearchResult{
+		Items: chapters,
+		Page:  1,
+		Size:  10,
+		Total: 1,
+	}
+
 	cacheRepository := &fakeCacheRepository{
 		found: false,
 	}
 
 	searchRepository := &fakeSearchRepository{
-		result: domain.SearchResult{
-			Items: chapters,
-			Page:  1,
-			Size:  10,
-			Total: 1,
-		},
+		result: searchResult,
 	}
 
 	service := NewSearchService(cacheRepository, searchRepository)
@@ -198,6 +211,14 @@ func TestSearchService_SearchesElasticsearchOnCacheMiss(t *testing.T) {
 
 	if !cacheRepository.putCalled {
 		t.Fatal("expected results to be stored in cache")
+	}
+
+	if !reflect.DeepEqual(cacheRepository.lastPutResult, searchResult) {
+		t.Fatalf(
+			"unexpected cache result: got %+v, want %+v",
+			cacheRepository.lastPutResult,
+			searchResult,
+		)
 	}
 
 	if len(result.Items) != 1 {
@@ -254,11 +275,9 @@ func TestSearchService_ReturnsErrorWhenSearchFails(t *testing.T) {
 		t.Fatalf("expected error %v, got %v", expectedErr, err)
 	}
 
-	if !cacheRepository.putCalled {
-		return
+	if cacheRepository.putCalled {
+		t.Fatal("expected cache repository not to be called after search failure")
 	}
-
-	t.Fatal("expected cache repository not to be called after search failure")
 }
 
 func TestSearchService_ReturnsErrorWhenCacheWriteFails(t *testing.T) {
