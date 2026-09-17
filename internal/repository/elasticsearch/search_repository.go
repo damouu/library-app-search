@@ -36,16 +36,14 @@ func NewSearchRepository(client *elasticsearch.Client) *SearchRepository {
 	}
 }
 
-func (s *SearchRepository) SearchChapters(
-	params domain.SearchParams,
-) (domain.SearchResult, error) {
+func (s *SearchRepository) SearchChapters(params domain.SearchParams) (domain.SearchResult, error) {
 	searchQuery := SearchQuery{
 		From: (params.Page - 1) * params.Size,
 		Size: params.Size,
 		Query: QueryClause{
 			MultiMatch: MultiMatch{
 				Query:  params.Query,
-				Fields: []string{"title", "second_title", "summary"},
+				Fields: []string{"title", "second_title"},
 			},
 		},
 	}
