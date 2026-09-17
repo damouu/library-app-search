@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"library-app-search/internal/domain"
 )
@@ -23,7 +24,7 @@ func NewSearchHandler(searchUseCase SearchUseCase) *SearchHandler {
 }
 
 func (s *SearchHandler) Search(w http.ResponseWriter, r *http.Request) {
-	query := r.URL.Query().Get("q")
+	query := strings.TrimSpace(r.URL.Query().Get("q"))
 
 	if query == "" {
 		http.Error(w, "missing query parameter: q", http.StatusBadRequest)
@@ -35,8 +36,12 @@ func (s *SearchHandler) Search(w http.ResponseWriter, r *http.Request) {
 
 	if pageParam := r.URL.Query().Get("page"); pageParam != "" {
 		parsedPage, err := strconv.Atoi(pageParam)
-		if err != nil || parsedPage < 1 {
-			http.Error(w, "page must be a positive integer", http.StatusBadRequest)
+		if err != nil || parsedPage < 1 || parsedPage > 1000 {
+			http.Error(
+				w,
+				"page must be an integer between 1 and 1000",
+				http.StatusBadRequest,
+			)
 			return
 		}
 
@@ -70,7 +75,6 @@ func (s *SearchHandler) Search(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
 
 	if err := json.NewEncoder(w).Encode(result); err != nil {
 		return
