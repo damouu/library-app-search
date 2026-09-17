@@ -9,28 +9,34 @@ import (
 	"library-app-search/internal/domain"
 )
 
+// SearchUseCase defines the application operation required by the search handler.
 type SearchUseCase interface {
 	SearchChapters(params domain.SearchParams) (domain.SearchResult, error)
 }
 
+// SearchHandler handles HTTP requests for chapter searches.
 type SearchHandler struct {
 	searchUseCase SearchUseCase
 }
 
+// NewSearchHandler creates a new search handler with the required use case.
 func NewSearchHandler(searchUseCase SearchUseCase) *SearchHandler {
 	return &SearchHandler{
 		searchUseCase: searchUseCase,
 	}
 }
 
+// Search handles chapter search requests and validates pagination parameters.
 func (s *SearchHandler) Search(w http.ResponseWriter, r *http.Request) {
 	query := strings.TrimSpace(r.URL.Query().Get("q"))
 
+	// Reject empty or whitespace-only search queries.
 	if query == "" {
 		http.Error(w, "missing query parameter: q", http.StatusBadRequest)
 		return
 	}
 
+	// Use sensible defaults when pagination parameters are omitted.
 	page := 1
 	size := 10
 
