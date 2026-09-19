@@ -10,10 +10,10 @@ import (
 
 	"library-app-search/internal/application"
 	"library-app-search/internal/config"
-	elasticsearchClient "library-app-search/internal/elasticsearch"
 	"library-app-search/internal/handler"
 	"library-app-search/internal/health"
-	elasticsearchRepository "library-app-search/internal/repository/elasticsearch"
+	opensearchClient "library-app-search/internal/opensearch"
+	opensearchRepository "library-app-search/internal/repository/opensearch"
 	redisRepository "library-app-search/internal/repository/redis"
 	"library-app-search/internal/router"
 )
@@ -27,12 +27,12 @@ type Application struct {
 
 // New builds the application dependency graph from the provided configuration.
 func New(cfg config.Config) (*Application, error) {
-	elasticsearch, err := elasticsearchClient.CreateClient(&cfg.Elasticsearch)
+	openSearch, err := opensearchClient.CreateClient(&cfg.OpenSearch)
 	if err != nil {
-		return nil, fmt.Errorf("create Elasticsearch client: %w", err)
+		return nil, fmt.Errorf("create OpenSearch client: %w", err)
 	}
 
-	searchRepository := elasticsearchRepository.NewSearchRepository(elasticsearch)
+	searchRepository := opensearchRepository.NewSearchRepository(openSearch)
 
 	redisClient, err := redisRepository.CreateClient(&cfg.Redis)
 	if err != nil {
@@ -48,14 +48,14 @@ func New(cfg config.Config) (*Application, error) {
 		return nil, fmt.Errorf("ping Redis: %w", err)
 	}
 
-	// Search results are cached for five minutes to reduce repeated Elasticsearch queries.
+	// Search results are cached for five minutes to reduce repeated OpenSearch queries.
 	cacheRepository := redisRepository.NewRedisCacheRepository(redisClient, 5*time.Minute)
 
 	searchService := application.NewSearchService(cacheRepository, searchRepository)
 
 	searchHandler := handler.NewSearchHandler(searchService)
 
-	healthChecker := elasticsearchClient.NewHealthChecker(elasticsearch)
+	healthChecker := opensearchClient.NewHealthChecker(openSearch)
 	healthHandler := health.NewHandler(healthChecker)
 
 	httpRouter := router.NewRouter(healthHandler, searchHandler)
