@@ -50,7 +50,7 @@ func TestReadyHandler_ReturnsOKWhenDependencyIsHealthy(t *testing.T) {
 
 func TestReadyHandler_ReturnsServiceUnavailableWhenDependencyFails(t *testing.T) {
 	checker := &fakeDependencyChecker{
-		err: errors.New("elasticsearch unavailable"),
+		err: errors.New("opensearch unavailable"),
 	}
 
 	handler := NewHandler(checker)

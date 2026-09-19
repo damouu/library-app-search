@@ -4,7 +4,7 @@ set -e
 
 go test \
   ./internal/config \
-  ./internal/elasticsearch \
+  ./internal/opensearch \
   ./internal/health \
   -coverprofile=coverage.out \
   -covermode=atomic

@@ -1,15 +1,16 @@
-package elasticsearch
+package opensearch
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 
-	"github.com/elastic/go-elasticsearch/v9"
+	"github.com/opensearch-project/opensearch-go/v4/opensearchapi"
 	"library-app-search/internal/domain"
 )
 
-// SearchHit represents an Elasticsearch search hit.
+// SearchHit represents an OpenSearch search hit.
 type SearchHit struct {
 	Source domain.Chapter `json:"_source"`
 }
@@ -25,18 +26,18 @@ type TotalHits struct {
 	Value int `json:"value"`
 }
 
-// SearchResponse represents the relevant part of the Elasticsearch search response.
+// SearchResponse represents the relevant part of the OpenSearch search response.
 type SearchResponse struct {
 	Hits SearchHits `json:"hits"`
 }
 
-// SearchRepository provides chapter search operations using Elasticsearch.
+// SearchRepository provides chapter search operations using OpenSearch.
 type SearchRepository struct {
-	client *elasticsearch.Client
+	client *opensearchapi.Client
 }
 
-// NewSearchRepository creates a search repository using the provided Elasticsearch client.
-func NewSearchRepository(client *elasticsearch.Client) *SearchRepository {
+// NewSearchRepository creates a search repository using the provided OpenSearch client.
+func NewSearchRepository(client *opensearchapi.Client) *SearchRepository {
 	return &SearchRepository{
 		client: client,
 	}
@@ -61,38 +62,32 @@ func (s *SearchRepository) SearchChapters(params domain.SearchParams) (domain.Se
 	}
 
 	response, err := s.client.Search(
-		s.client.Search.WithIndex("chapters"),
-		s.client.Search.WithBody(bytes.NewReader(requestBody)),
+		context.Background(),
+		&opensearchapi.SearchReq{
+			Indices: []string{"chapters"},
+			Body:    bytes.NewReader(requestBody),
+		},
 	)
 	if err != nil {
-		return domain.SearchResult{}, err
+		return domain.SearchResult{}, fmt.Errorf("search OpenSearch: %w", err)
 	}
 
-	defer response.Body.Close()
+	chapters := make([]domain.Chapter, 0, len(response.Hits.Hits))
 
-	if response.IsError() {
-		return domain.SearchResult{}, fmt.Errorf(
-			"elasticsearch error: %s",
-			response.Status(),
-		)
-	}
+	for _, hit := range response.Hits.Hits {
+		var chapter domain.Chapter
 
-	var searchResponse SearchResponse
+		if err := json.Unmarshal(hit.Source, &chapter); err != nil {
+			return domain.SearchResult{}, fmt.Errorf("decode chapter: %w", err)
+		}
 
-	if err := json.NewDecoder(response.Body).Decode(&searchResponse); err != nil {
-		return domain.SearchResult{}, err
-	}
-
-	chapters := make([]domain.Chapter, 0, len(searchResponse.Hits.Hits))
-
-	for _, hit := range searchResponse.Hits.Hits {
-		chapters = append(chapters, hit.Source)
+		chapters = append(chapters, chapter)
 	}
 
 	return domain.SearchResult{
 		Items: chapters,
 		Page:  params.Page,
 		Size:  params.Size,
-		Total: searchResponse.Hits.Total.Value,
+		Total: response.Hits.Total.Value,
 	}, nil
 }

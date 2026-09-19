@@ -7,19 +7,20 @@ import (
 )
 
 type Config struct {
-	Server        ServerConfig
-	Elasticsearch ElasticsearchConfig
-	Redis         RedisConfig
-	Tracing       TracingConfig
+	Server     ServerConfig
+	OpenSearch OpenSearchConfig
+	Redis      RedisConfig
+	Tracing    TracingConfig
 }
 
 type ServerConfig struct {
 	Port string
 }
 
-type ElasticsearchConfig struct {
-	URL    string
-	APIKey string
+type OpenSearchConfig struct {
+	URL      string
+	Username string
+	Password string
 }
 
 type RedisConfig struct {
@@ -35,9 +36,20 @@ func Load() Config {
 	_ = godotenv.Load()
 
 	return Config{
-		Server:        ServerConfig{Port: os.Getenv("SERVER_PORT")},
-		Elasticsearch: ElasticsearchConfig{URL: os.Getenv("ELASTICSEARCH_URL"), APIKey: os.Getenv("ELASTICSEARCH_API_KEY")},
-		Redis:         RedisConfig{URL: os.Getenv("REDIS_URL")},
-		Tracing:       TracingConfig{ServiceName: os.Getenv("OTEL_SERVICE_NAME"), Endpoint: os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")},
+		Server: ServerConfig{
+			Port: os.Getenv("SERVER_PORT"),
+		},
+		OpenSearch: OpenSearchConfig{
+			URL:      os.Getenv("OPENSEARCH_URL"),
+			Username: os.Getenv("OPENSEARCH_USERNAME"),
+			Password: os.Getenv("OPENSEARCH_PASSWORD"),
+		},
+		Redis: RedisConfig{
+			URL: os.Getenv("REDIS_URL"),
+		},
+		Tracing: TracingConfig{
+			ServiceName: os.Getenv("OTEL_SERVICE_NAME"),
+			Endpoint:    os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"),
+		},
 	}
 }

@@ -1,4 +1,4 @@
-package elasticsearch
+package opensearch
 
 type SearchQuery struct {
 	From  int         `json:"from"`
