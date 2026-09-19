@@ -253,7 +253,7 @@ func TestSearchService_ReturnsErrorWhenCacheFails(t *testing.T) {
 }
 
 func TestSearchService_ReturnsErrorWhenSearchFails(t *testing.T) {
-	expectedErr := errors.New("elasticsearch unavailable")
+	expectedErr := errors.New("opensearch unavailable")
 
 	cacheRepository := &fakeCacheRepository{
 		found: false,
