@@ -1,12 +1,23 @@
 package handler
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
+	uuid2 "uuid"
+
+	"github.com/google/uuid"
 
 	"library-app-search/internal/domain"
+)
+
+var (
+	testChapterUUID = uuid.MustParse("ea0fbdc6-8b84-4c42-9ce8-8e07d9c29818")
+	testSeriesUUID  = uuid.MustParse("df1b59e5-d788-4e5b-975a-161ec33e1d0e")
+	testDate        = time.Date(2026, time.July, 10, 0, 0, 0, 0, time.UTC)
 )
 
 type fakeSearchUseCase struct {
@@ -55,13 +66,23 @@ func TestSearchHandler_ReturnsChapters(t *testing.T) {
 		result: domain.SearchResult{
 			Items: []domain.Chapter{
 				{
-					ChapterUUID: "chapter-1",
-					Title:       "One Piece",
+					ChapterUUID:     uuid2.UUID(testChapterUUID),
+					SeriesUUID:      uuid2.UUID(testSeriesUUID),
+					Title:           "One Piece",
+					SecondTitle:     "One Piece",
+					Summary:         "Test summary",
+					ChapterNumber:   1,
+					TotalPages:      177,
+					PublicationDate: testDate,
+					CoverArtworkURL: "https://example.com/cover.jpg",
 				},
 			},
-			Page:  1,
-			Size:  10,
-			Total: 1,
+			Page:       1,
+			Size:       10,
+			Total:      1,
+			TotalPages: 1,
+			HasNext:    false,
+			HasPrev:    false,
 		},
 	}
 
@@ -89,24 +110,85 @@ func TestSearchHandler_ReturnsChapters(t *testing.T) {
 		t.Fatal("expected use case to be called")
 	}
 
-	expectedBody := `{"items":[{"chapter_uuid":"chapter-1","series_uuid":"","title":"One Piece","second_title":"","summary":"","chapter_number":0,"total_pages":0,"publication_date":"","cover_artwork_url":""}],"page":1,"size":10,"total":1}` + "\n"
+	var response SearchResponse
 
-	if recorder.Body.String() != expectedBody {
+	if err := json.NewDecoder(recorder.Body).Decode(&response); err != nil {
+		t.Fatalf("failed to decode response body: %v", err)
+	}
+
+	if len(response.Items) != 1 {
+		t.Fatalf("expected 1 chapter, got %d", len(response.Items))
+	}
+
+	chapter := response.Items[0]
+
+	if chapter.ChapterUUID != testChapterUUID.String() {
 		t.Fatalf(
-			"expected body %s, got %s",
-			expectedBody,
-			recorder.Body.String(),
+			"expected chapter UUID %q, got %q",
+			testChapterUUID.String(),
+			chapter.ChapterUUID,
 		)
+	}
+
+	if chapter.SeriesUUID != testSeriesUUID.String() {
+		t.Fatalf(
+			"expected series UUID %q, got %q",
+			testSeriesUUID.String(),
+			chapter.SeriesUUID,
+		)
+	}
+
+	if chapter.Title != "One Piece" {
+		t.Fatalf(
+			"expected title %q, got %q",
+			"One Piece",
+			chapter.Title,
+		)
+	}
+
+	if chapter.PublicationDate != "2026-07-10" {
+		t.Fatalf(
+			"expected publication date %q, got %q",
+			"2026-07-10",
+			chapter.PublicationDate,
+		)
+	}
+
+	if response.Page != 1 {
+		t.Fatalf("expected page %d, got %d", 1, response.Page)
+	}
+
+	if response.Size != 10 {
+		t.Fatalf("expected size %d, got %d", 10, response.Size)
+	}
+
+	if response.Total != 1 {
+		t.Fatalf("expected total %d, got %d", 1, response.Total)
+	}
+
+	if response.TotalPages != 1 {
+		t.Fatalf("expected total pages %d, got %d", 1, response.TotalPages)
+	}
+
+	if response.HasNext {
+		t.Fatal("expected has_next to be false")
+	}
+
+	if response.HasPrev {
+		t.Fatal("expected has_prev to be false")
 	}
 }
 
 func TestSearchHandler_ReturnsEmptyArrayWhenNoChapterIsFound(t *testing.T) {
 	useCase := &fakeSearchUseCase{
 		result: domain.SearchResult{
-			Items: []domain.Chapter{},
-			Page:  1,
-			Size:  10,
-			Total: 0,
+			Items:      []domain.Chapter{},
+			Page:       1,
+			Size:       10,
+			Total:      0,
+			TotalPages: 0,
+			HasNext:    false,
+			HasPrev:    false,
 		},
 	}
 
@@ -130,14 +212,34 @@ func TestSearchHandler_ReturnsEmptyArrayWhenNoChapterIsFound(t *testing.T) {
 		)
 	}
 
-	expectedBody := `{"items":[],"page":1,"size":10,"total":0}` + "\n"
+	var response SearchResponse
 
-	if recorder.Body.String() != expectedBody {
-		t.Fatalf(
-			"expected body %s, got %s",
-			expectedBody,
-			recorder.Body.String(),
-		)
+	if err := json.NewDecoder(recorder.Body).Decode(&response); err != nil {
+		t.Fatalf("failed to decode response body: %v", err)
+	}
+
+	if response.Items == nil {
+		t.Fatal("expected items to be an empty array, got nil")
+	}
+
+	if len(response.Items) != 0 {
+		t.Fatalf("expected 0 chapters, got %d", len(response.Items))
+	}
+
+	if response.Page != 1 {
+		t.Fatalf("expected page %d, got %d", 1, response.Page)
+	}
+
+	if response.Size != 10 {
+		t.Fatalf("expected size %d, got %d", 10, response.Size)
+	}
+
+	if response.Total != 0 {
+		t.Fatalf("expected total %d, got %d", 0, response.Total)
+	}
+
+	if response.TotalPages != 0 {
+		t.Fatalf("expected total pages %d, got %d", 0, response.TotalPages)
 	}
 }
 
@@ -170,10 +272,13 @@ func TestSearchHandler_ReturnsInternalServerErrorWhenUseCaseFails(t *testing.T) 
 func TestSearchHandler_PassesPaginationParametersToUseCase(t *testing.T) {
 	useCase := &fakeSearchUseCase{
 		result: domain.SearchResult{
-			Items: []domain.Chapter{},
-			Page:  2,
-			Size:  3,
-			Total: 13,
+			Items:      []domain.Chapter{},
+			Page:       2,
+			Size:       3,
+			Total:      13,
+			TotalPages: 5,
+			HasNext:    true,
+			HasPrev:    true,
 		},
 	}
 
