@@ -18,6 +18,7 @@ func main() {
 	cfg := config.Load()
 
 	app, err := bootstrap.New(cfg)
+
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -39,11 +40,8 @@ func main() {
 		}
 	}()
 
-	signalCtx, stop := signal.NotifyContext(
-		context.Background(),
-		os.Interrupt,
-		syscall.SIGTERM,
-	)
+	signalCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+
 	defer stop()
 
 	select {
@@ -54,10 +52,8 @@ func main() {
 		log.Fatalf("HTTP server failed: %v", err)
 	}
 
-	shutdownCtx, cancel := context.WithTimeout(
-		context.Background(),
-		10*time.Second,
-	)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+
 	defer cancel()
 
 	if err := server.Shutdown(shutdownCtx); err != nil {
