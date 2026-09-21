@@ -29,18 +29,23 @@ func (s *SearchService) SearchChapters(params domain.SearchParams) (domain.Searc
 		return domain.SearchResult{}, err
 	}
 
-	if found {
-		return result, nil
-	}
+	if !found {
+		result, err = s.searchRepository.SearchChapters(params)
+		if err != nil {
+			return domain.SearchResult{}, err
+		}
 
-	result, err = s.searchRepository.SearchChapters(params)
-	if err != nil {
-		return domain.SearchResult{}, err
-	}
+		totalPages := (result.Total + result.Size - 1) / result.Size
 
-	err = s.cacheRepository.PutChaptersCache(params, result)
-	if err != nil {
-		return domain.SearchResult{}, err
+		result.TotalPages = totalPages
+		result.HasNext = result.Page < totalPages
+		result.HasPrev = result.Page > 1
+
+		err = s.cacheRepository.PutChaptersCache(params, result)
+
+		if err != nil {
+			return domain.SearchResult{}, err
+		}
 	}
 
 	return result, nil
