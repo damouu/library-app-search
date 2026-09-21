@@ -30,13 +30,11 @@ func NewSearchHandler(searchUseCase SearchUseCase) *SearchHandler {
 func (s *SearchHandler) Search(w http.ResponseWriter, r *http.Request) {
 	query := strings.TrimSpace(r.URL.Query().Get("q"))
 
-	// Reject empty or whitespace-only search queries.
 	if query == "" {
 		http.Error(w, "missing query parameter: q", http.StatusBadRequest)
 		return
 	}
 
-	// Use sensible defaults when pagination parameters are omitted.
 	page := 1
 	size := 10
 
@@ -80,9 +78,11 @@ func (s *SearchHandler) Search(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	response := toSearchResponse(result)
+
 	w.Header().Set("Content-Type", "application/json")
 
-	if err := json.NewEncoder(w).Encode(result); err != nil {
+	if err := json.NewEncoder(w).Encode(response); err != nil {
 		return
 	}
 }
