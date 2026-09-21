@@ -61,8 +61,7 @@ func (s *SearchRepository) SearchChapters(params domain.SearchParams) (domain.Se
 		return domain.SearchResult{}, err
 	}
 
-	response, err := s.client.Search(
-		context.Background(),
+	response, err := s.client.Search(context.Background(),
 		&opensearchapi.SearchReq{
 			Indices: []string{"chapters"},
 			Body:    bytes.NewReader(requestBody),
@@ -75,10 +74,15 @@ func (s *SearchRepository) SearchChapters(params domain.SearchParams) (domain.Se
 	chapters := make([]domain.Chapter, 0, len(response.Hits.Hits))
 
 	for _, hit := range response.Hits.Hits {
-		var chapter domain.Chapter
+		var document ChapterDocument
 
-		if err := json.Unmarshal(hit.Source, &chapter); err != nil {
-			return domain.SearchResult{}, fmt.Errorf("decode chapter: %w", err)
+		if err := json.Unmarshal(hit.Source, &document); err != nil {
+			return domain.SearchResult{}, fmt.Errorf("decode chapter document: %w", err)
+		}
+
+		chapter, err := toDomainChapter(document)
+		if err != nil {
+			return domain.SearchResult{}, fmt.Errorf("map chapter document: %w", err)
 		}
 
 		chapters = append(chapters, chapter)

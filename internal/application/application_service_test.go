@@ -4,8 +4,16 @@ import (
 	"errors"
 	"reflect"
 	"testing"
+	uuid2 "uuid"
+
+	"github.com/google/uuid"
 
 	"library-app-search/internal/domain"
+)
+
+var (
+	testChapterUUID = uuid.MustParse("ea0fbdc6-8b84-4c42-9ce8-8e07d9c29818")
+	testSeriesUUID  = uuid.MustParse("df1b59e5-d788-4e5b-975a-161ec33e1d0e")
 )
 
 type fakeCacheRepository struct {
@@ -114,16 +122,20 @@ func TestSearchService_PropagatesSearchParams(t *testing.T) {
 func TestSearchService_ReturnsCachedChapters(t *testing.T) {
 	cachedChapters := []domain.Chapter{
 		{
-			ChapterUUID: "chapter-1",
+			ChapterUUID: uuid2.UUID(testChapterUUID),
+			SeriesUUID:  uuid2.UUID(testSeriesUUID),
 			Title:       "One Piece",
 		},
 	}
 
 	cachedResult := domain.SearchResult{
-		Items: cachedChapters,
-		Page:  1,
-		Size:  10,
-		Total: 1,
+		Items:      cachedChapters,
+		Page:       1,
+		Size:       10,
+		Total:      1,
+		TotalPages: 1,
+		HasNext:    false,
+		HasPrev:    false,
 	}
 
 	cacheRepository := &fakeCacheRepository{
@@ -170,19 +182,23 @@ func TestSearchService_ReturnsCachedChapters(t *testing.T) {
 	}
 }
 
-func TestSearchService_SearchesElasticsearchOnCacheMiss(t *testing.T) {
+func TestSearchService_SearchesOpenSearchOnCacheMiss(t *testing.T) {
 	chapters := []domain.Chapter{
 		{
-			ChapterUUID: "chapter-1",
+			ChapterUUID: uuid2.UUID(testChapterUUID),
+			SeriesUUID:  uuid2.UUID(testSeriesUUID),
 			Title:       "One Piece",
 		},
 	}
 
 	searchResult := domain.SearchResult{
-		Items: chapters,
-		Page:  1,
-		Size:  10,
-		Total: 1,
+		Items:      chapters,
+		Page:       1,
+		Size:       10,
+		Total:      1,
+		TotalPages: 1,
+		HasNext:    false,
+		HasPrev:    false,
 	}
 
 	cacheRepository := &fakeCacheRepository{
@@ -290,10 +306,13 @@ func TestSearchService_ReturnsErrorWhenCacheWriteFails(t *testing.T) {
 
 	searchRepository := &fakeSearchRepository{
 		result: domain.SearchResult{
-			Items: []domain.Chapter{},
-			Page:  1,
-			Size:  10,
-			Total: 0,
+			Items:      []domain.Chapter{},
+			Page:       1,
+			Size:       10,
+			Total:      0,
+			TotalPages: 0,
+			HasNext:    false,
+			HasPrev:    false,
 		},
 	}
 

@@ -6,14 +6,25 @@ import (
 	"reflect"
 	"testing"
 	"time"
+	uuid2 "uuid"
 
 	miniRedis "github.com/alicebob/miniredis/v2"
+	"github.com/google/uuid"
 	goredis "github.com/redis/go-redis/v9"
 
 	"library-app-search/internal/domain"
 )
 
-func newTestCacheRepository(t *testing.T, ttl time.Duration) (*CacheRepository, *miniRedis.Miniredis, *goredis.Client) {
+var (
+	testChapterUUID = uuid.MustParse("ea0fbdc6-8b84-4c42-9ce8-8e07d9c29818")
+	testSeriesUUID  = uuid.MustParse("df1b59e5-d788-4e5b-975a-161ec33e1d0e")
+	testDate        = time.Date(2026, time.July, 10, 0, 0, 0, 0, time.UTC)
+)
+
+func newTestCacheRepository(
+	t *testing.T,
+	ttl time.Duration,
+) (*CacheRepository, *miniRedis.Miniredis, *goredis.Client) {
 	t.Helper()
 
 	server, err := miniRedis.Run()
@@ -70,13 +81,18 @@ func TestCacheRepository_PutAndFetchChaptersCache(t *testing.T) {
 	expectedResult := domain.SearchResult{
 		Items: []domain.Chapter{
 			{
-				ChapterUUID: "chapter-1",
-				Title:       "One Piece",
+				ChapterUUID:     uuid2.UUID(testChapterUUID),
+				SeriesUUID:      uuid2.UUID(testSeriesUUID),
+				Title:           "One Piece",
+				PublicationDate: testDate,
 			},
 		},
-		Page:  2,
-		Size:  3,
-		Total: 1,
+		Page:       2,
+		Size:       3,
+		Total:      1,
+		TotalPages: 1,
+		HasNext:    false,
+		HasPrev:    true,
 	}
 
 	err := repository.PutChaptersCache(params, expectedResult)
@@ -112,10 +128,13 @@ func TestCacheRepository_PutChaptersCache_UsesExpectedCacheKey(t *testing.T) {
 	}
 
 	expectedResult := domain.SearchResult{
-		Items: []domain.Chapter{},
-		Page:  1,
-		Size:  3,
-		Total: 0,
+		Items:      []domain.Chapter{},
+		Page:       1,
+		Size:       3,
+		Total:      0,
+		TotalPages: 0,
+		HasNext:    false,
+		HasPrev:    false,
 	}
 
 	err := repository.PutChaptersCache(params, expectedResult)
@@ -146,13 +165,18 @@ func TestCacheRepository_PutChaptersCache_ExpiresAfterTTL(t *testing.T) {
 	expectedResult := domain.SearchResult{
 		Items: []domain.Chapter{
 			{
-				ChapterUUID: "chapter-1",
-				Title:       "One Piece",
+				ChapterUUID:     uuid2.UUID(testChapterUUID),
+				SeriesUUID:      uuid2.UUID(testSeriesUUID),
+				Title:           "One Piece",
+				PublicationDate: testDate,
 			},
 		},
-		Page:  1,
-		Size:  10,
-		Total: 1,
+		Page:       1,
+		Size:       10,
+		Total:      1,
+		TotalPages: 1,
+		HasNext:    false,
+		HasPrev:    false,
 	}
 
 	err := repository.PutChaptersCache(params, expectedResult)
@@ -215,10 +239,13 @@ func TestCacheRepository_PutChaptersCache_ReturnsErrorWhenRedisFails(t *testing.
 	}
 
 	result := domain.SearchResult{
-		Items: []domain.Chapter{},
-		Page:  1,
-		Size:  10,
-		Total: 0,
+		Items:      []domain.Chapter{},
+		Page:       1,
+		Size:       10,
+		Total:      0,
+		TotalPages: 0,
+		HasNext:    false,
+		HasPrev:    false,
 	}
 
 	err := repository.PutChaptersCache(params, result)
