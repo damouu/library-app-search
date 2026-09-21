@@ -8,10 +8,7 @@ import (
 )
 
 // NewRouter builds the HTTP router and registers the service endpoints.
-func NewRouter(
-	h *health.Handler,
-	searchHandler *handler.SearchHandler,
-) chi.Router {
+func NewRouter(h *health.Handler, searchHandler *handler.SearchHandler) chi.Router {
 	router := chi.NewRouter()
 
 	// Add a unique ID to each request for log correlation.
