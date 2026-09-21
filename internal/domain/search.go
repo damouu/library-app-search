@@ -7,8 +7,11 @@ type SearchParams struct {
 }
 
 type SearchResult struct {
-	Items []Chapter `json:"items"`
-	Page  int       `json:"page"`
-	Size  int       `json:"size"`
-	Total int       `json:"total"`
+	Items      []Chapter
+	Page       int
+	Size       int
+	Total      int
+	TotalPages int
+	HasNext    bool
+	HasPrev    bool
 }
