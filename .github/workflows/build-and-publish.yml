@@ -2,20 +2,22 @@ name: build-and-publish
 
 on:
   workflow_run:
-    workflows: [ "Prepare" ]
+    workflows: ["Prepare"]
     types:
       - completed
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
       - name: Download SHA Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: specific-sha
           run-id: ${{ github.event.workflow_run.id }}
@@ -24,12 +26,15 @@ jobs:
       - name: Read SHA into Variable
         id: get_sha
         run: |
-          # Read the file content into an environment variable
-          echo "SHA=$(cat sha.txt)" >> $GITHUB_ENV
+          echo "SHA=$(cat sha.txt)" >> "$GITHUB_ENV"
 
+      - name: Checkout EXACT commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ env.SHA }}
 
       - name: Docker Build and Push Action
-        uses: mr-smithers-excellent/docker-build-push@v5
+        uses: mr-smithers-excellent/docker-build-push@0e68818ea37ba7728f417f03a58e06e68d9d2592
         with:
           directory: .
           dockerfile: 'docker/Dockerfile.prod'
@@ -39,3 +44,39 @@ jobs:
           registry: docker.io
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Checkout GitOps repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: damouu/distributed-library-system
+          token: ${{ secrets.GITOPS_TOKEN }}
+          path: gitops
+
+      - name: Update Search API image
+        env:
+          SHA: ${{ env.SHA }}
+        run: |
+          sed -i \
+            "s#image: damou/library-app-search:.*#image: damou/library-app-search:${SHA}#" \
+            gitops/kubernetes/search-api/deployment.yaml
+
+      - name: Validate GitOps manifest
+        run: |
+          kubectl kustomize gitops/kubernetes/search-api
+
+      - name: Commit GitOps manifest
+        env:
+          SHA: ${{ env.SHA }}
+        run: |
+          cd gitops
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add kubernetes/search-api/deployment.yaml
+
+          git commit \
+            -m "chore(search-api): deploy ${SHA}" \
+            || exit 0
+
+          git push origin main
